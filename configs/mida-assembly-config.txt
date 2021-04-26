@@ -1,0 +1,209 @@
+##
+## Configuration file
+##
+
+## For battery discharge: N=100 Ty=10 SperNode = 3 Exp=50
+
+simulation.cycles 6*200  # 200
+simulation.experiments 50 # 50
+NETWORK_SIZE 100
+
+SERVICES_PER_NODE 5 #number of services per node
+
+TYPES 10   
+
+DEGREE 6 # must be less than cache size
+
+STRATEGY random  # 6 strategies: 1) random, 2) green_learning, 3) local_energy, 4) fair_energy, 5) maxb, 6) maxg
+
+M 5 # period of the learner
+
+COMPOSITION_STEPS 6 # the system runs a composition step every 6 simulation cycles
+
+SOLAR_STEP 1
+
+random.seed 1234554324
+
+simulation.logtime 1000
+
+##### Network parameters
+network.size NETWORK_SIZE
+network.node lnu.mida.entity.GeneralNode
+
+#### Link Layer ####
+protocol.lnk example.newscast.SimpleNewscast
+protocol.lnk.cache 18
+protocol.lnk.step 2
+
+#protocol.lnk peersim.core.IdleProtocol
+
+##### Location implementation (for Vivaldi) ##### 
+network.node.loc_impl CircleLocation
+network.node.loc_impl.radius 100  # nodes are positioned in a radius of 100 meters
+
+##### Coordinate protocols - LEVEL 0 ######
+protocol.vivp VivaldiProtocol
+protocol.vivp.linkable lnk
+protocol.vivp.coord_impl Dim2DVivaldiCoordinate
+protocol.vivp.correction_factor 0.5
+protocol.vivp.uncertainty_factor 0.5
+
+#### Assembly Layer - LEVEL 1 ####
+protocol.ca lnu.mida.protocol.OverloadComponentAssembly
+protocol.ca.linkable lnk
+protocol.ca.appl_prot appl
+protocol.ca.types TYPES
+
+#### Application Layer - LEVEL 2 ####
+protocol.appl lnu.mida.protocol.OverloadApplication
+protocol.appl.linkable lnk
+protocol.appl.comp_prot ca
+
+##
+## Initializers
+##
+
+##### Wiring protocol ######
+#init.wire WireScaleFreeBA
+#init.wire.protocol lnk
+#init.wire.k DEGREE
+#init.wire.undir true
+
+init.wire peersim.dynamics.WireKOut
+init.wire.protocol lnk
+init.wire.k DEGREE
+
+## Location initializer
+init.loci LocationInitializer
+
+## Vivaldi Stabilizer
+init.vivs VivaldiStabilizer
+init.vivs.protocol vivp
+
+## Component initializer
+init.ci lnu.mida.controller.init.OverloadComponentInitializer
+init.ci.appl_prot appl
+init.ci.comp_prot ca
+init.ci.types TYPES
+
+## Dependency initializer
+init.pdi lnu.mida.controller.init.ProbDependencyInitializer
+init.pdi.comp_prot ca
+init.pdi.prob 0.6
+
+## File initializer
+init.fi lnu.mida.controller.init.OverloadFileInitializer
+
+##
+## Observers
+##
+control.qeC lnu.mida.controller.observer.QualityEnergyObserver
+control.qeC.protocol ca
+control.qeC.from COMPOSITION_STEPS
+control.qeC.step COMPOSITION_STEPS
+
+control.FinalutilC lnu.mida.controller.observer.FinalUtilityObserver
+control.FinalutilC.protocol ca
+control.FinalutilC.at simulation.cycles-1
+
+##
+## Controllers
+##
+
+# Composition controller
+control.compctr lnu.mida.controller.OverloadCompositionController
+control.compctr.appl_prot appl
+control.compctr.comp_prot ca
+control.compctr.from COMPOSITION_STEPS
+control.compctr.step COMPOSITION_STEPS
+
+control.linkctr lnu.mida.controller.LinkController
+control.linkctr.appl_prot appl
+control.linkctr.comp_prot ca
+control.linkctr.from COMPOSITION_STEPS
+control.linkctr.step COMPOSITION_STEPS
+
+control.reset lnu.mida.controller.OverloadReset
+control.reset.appl_prot appl
+control.reset.comp_prot ca
+control.reset.from COMPOSITION_STEPS
+control.reset.step COMPOSITION_STEPS
+
+# Energy consumption controller
+control.enectr lnu.mida.controller.energy.EnergyController
+control.enectr.appl_prot appl
+control.enectr.comp_prot ca
+control.enectr.viv_prot vivp
+control.enectr.from COMPOSITION_STEPS
+control.enectr.step COMPOSITION_STEPS
+
+# Solar controller
+control.solar lnu.mida.controller.SolarController
+control.solar.appl_prot appl
+control.solar.comp_prot ca
+control.solar.from SOLAR_STEP
+control.solar.step SOLAR_STEP
+
+# Battery controller
+control.battery lnu.mida.controller.BatteryController
+control.battery.appl_prot appl
+control.battery.comp_prot ca
+control.battery.from SOLAR_STEP
+control.battery.step SOLAR_STEP
+
+
+# Id control reset 
+control.idctr lnu.mida.controller.OverloadIdController
+control.idctr.appl_prot appl
+control.idctr.comp_prot ca
+control.idctr.at simulation.cycles-1
+
+# Dynamic node change L
+control.changel lnu.mida.controller.OverloadComponentChangeL
+control.changel.appl_prot appl
+control.changel.comp_prot ca
+control.changel.num 100
+control.changel.from COMPOSITION_STEPS*100
+control.changel.step COMPOSITION_STEPS*100
+
+# Dynamic node fail
+control.failures lnu.mida.controller.dynamic.OverloadComponentFailures
+control.failures.appl_prot appl
+control.failures.comp_prot ca
+control.failures.num 50
+control.failures.from COMPOSITION_STEPS*5
+control.failures.step COMPOSITION_STEPS*5
+
+# Dynamic node join
+control.dynpeer peersim.dynamics.DynamicNetwork
+control.dynpeer.add 50
+control.dynpeer.from COMPOSITION_STEPS*5
+control.dynpeer.step COMPOSITION_STEPS*5
+
+
+control.dynpeer.init.0 RandNI
+control.dynpeer.init.0.k DEGREE
+control.dynpeer.init.0.protocol lnk
+
+control.dynpeer.init.1 lnu.mida.controller.dynamic.OverloadNewNodeInitializer
+control.dynpeer.init.1.comp_prot ca
+control.dynpeer.init.1.app_prot appl
+control.dynpeer.init.1.viv_prot vivp
+
+# Vivaldi Observer
+control.vivo VivaldiObserver
+control.vivo.protocol vivp
+control.vivo.threshold 0.0
+
+# Shuffle
+control.shf Shuffle
+
+include.init wire loci vivs ci pdi fi
+
+# scenario D
+include.control shf linkctr solar battery enectr compctr qeC FinalutilC reset idctr
+
+# scenario D con dinamicità
+#include.control shf linkctr solar battery enectr compctr qeC FinalutilC reset idctr failures dynpeer
+
+include.protocol lnk vivp ca appl
